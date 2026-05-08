@@ -14,10 +14,11 @@ import (
 	appconfigurationschema "github.com/onelogin/terraform-provider-onelogin/ol_schema/app/configuration"
 	appparametersschema "github.com/onelogin/terraform-provider-onelogin/ol_schema/app/parameters"
 	appprovisioningschema "github.com/onelogin/terraform-provider-onelogin/ol_schema/app/provisioning"
+	appssoschema "github.com/onelogin/terraform-provider-onelogin/ol_schema/app/sso"
 	"github.com/onelogin/terraform-provider-onelogin/utils"
 )
 
-// OIDCApps attaches additional configuration schema and
+// OIDCApps attaches additional configuration and sso schemas and
 // returns a resource with the CRUD methods and Terraform Schema defined
 func OIDCApps() *schema.Resource {
 	appSchema := appschema.Schema()
@@ -25,6 +26,13 @@ func OIDCApps() *schema.Resource {
 		Type:     schema.TypeMap,
 		Optional: true,
 		Elem:     &schema.Schema{Type: schema.TypeString},
+	}
+	appSchema["sso"] = &schema.Schema{
+		Type:      schema.TypeMap,
+		Optional:  true,
+		Computed:  true,
+		Sensitive: true,
+		Elem:      &schema.Schema{Type: schema.TypeString},
 	}
 	return &schema.Resource{
 		CreateContext: oidcAppCreate,
@@ -80,6 +88,15 @@ func oidcAppCreate(ctx context.Context, d *schema.ResourceData, m interface{}) d
 	})
 
 	d.SetId(fmt.Sprintf("%d", appID))
+
+	// The OIDC client_secret is only returned in the create response. Persist
+	// it to state before Read runs, since subsequent reads cannot recover it.
+	if ssoRaw, ok := appMap["sso"]; ok {
+		if ssoData, ok := ssoRaw.(map[string]interface{}); ok {
+			d.Set("sso", appssoschema.Flatten(ssoData))
+		}
+	}
+
 	return oidcAppRead(ctx, d, m)
 }
 
@@ -138,6 +155,23 @@ func oidcAppRead(ctx context.Context, d *schema.ResourceData, m interface{}) dia
 	if v, ok := appMap["configuration"]; ok {
 		if configData, ok := v.(map[string]interface{}); ok {
 			d.Set("configuration", appconfigurationschema.Flatten(configData))
+		}
+	}
+
+	// Handle SSO if it exists
+	if v, ok := appMap["sso"]; ok {
+		if ssoData, ok := v.(map[string]interface{}); ok {
+			ssoMap := appssoschema.Flatten(ssoData)
+			// client_secret is only returned at app creation. Preserve the
+			// value already in state so subsequent reads don't drop it.
+			if _, hasSecret := ssoMap["client_secret"]; !hasSecret {
+				if existing, ok := d.Get("sso").(map[string]interface{}); ok {
+					if existingSecret, ok := existing["client_secret"].(string); ok && existingSecret != "" {
+						ssoMap["client_secret"] = existingSecret
+					}
+				}
+			}
+			d.Set("sso", ssoMap)
 		}
 	}
 

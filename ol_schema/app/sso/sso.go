@@ -82,6 +82,10 @@ func Flatten(ssoData map[string]interface{}) map[string]interface{} {
 		tfMap["client_id"] = clientID
 	}
 
+	if clientSecret, ok := ssoData["client_secret"].(string); ok {
+		tfMap["client_secret"] = clientSecret
+	}
+
 	// Return the flattened map
 	return tfMap
 }
