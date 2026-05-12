@@ -14,6 +14,7 @@ import (
 type CustomConfigurationOpenId struct {
 	RedirectURI                   string `json:"redirect_uri,omitempty"`
 	LoginURL                      string `json:"login_url,omitempty"`
+	PostLogoutRedirectURI         string `json:"post_logout_redirect_uri,omitempty"`
 	OidcApplicationType           int    `json:"oidc_application_type,omitempty"`
 	TokenEndpointAuthMethod       int    `json:"token_endpoint_auth_method,omitempty"`
 	AccessTokenExpirationMinutes  *int   `json:"access_token_expiration_minutes,omitempty"`
@@ -88,6 +89,7 @@ func Inflate(s map[string]interface{}) (interface{}, error) {
 		// Set OIDC fields
 		customOidc.RedirectURI = getString(s["redirect_uri"])
 		customOidc.LoginURL = getString(s["login_url"])
+		customOidc.PostLogoutRedirectURI = getString(s["post_logout_redirect_uri"])
 
 		// Handle timeout fields specially - only set them if explicitly provided and non-empty
 		// This prevents overriding existing API values with 0 when fields are not specified
@@ -212,6 +214,10 @@ func Flatten(config map[string]interface{}) map[string]interface{} {
 
 		if val, ok := config["login_url"].(string); ok && val != "" {
 			tfOut["login_url"] = val
+		}
+
+		if val, ok := config["post_logout_redirect_uri"].(string); ok && val != "" {
+			tfOut["post_logout_redirect_uri"] = val
 		}
 
 		// Handle numeric fields, converting to string
