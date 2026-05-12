@@ -9,6 +9,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func assertIntPtrEqual(t *testing.T, expected, actual *int) {
+	t.Helper()
+	if expected == nil {
+		assert.Nil(t, actual)
+		return
+	}
+	if assert.NotNil(t, actual) {
+		assert.Equal(t, *expected, *actual)
+	}
+}
+
 func TestInflateConfiguration(t *testing.T) {
 	tests := map[string]struct {
 		ResourceData   map[string]interface{}
@@ -28,8 +39,8 @@ func TestInflateConfiguration(t *testing.T) {
 				RedirectURI:                   "test",
 				RefreshTokenExpirationMinutes: intPtr(2),
 				LoginURL:                      "test",
-				OidcApplicationType:           2,
-				TokenEndpointAuthMethod:       2,
+				OidcApplicationType:           intPtr(2),
+				TokenEndpointAuthMethod:       intPtr(2),
 				AccessTokenExpirationMinutes:  intPtr(2),
 			},
 		},
@@ -41,8 +52,8 @@ func TestInflateConfiguration(t *testing.T) {
 			},
 			ExpectedOutput: CustomConfigurationOpenId{
 				RedirectURI:             "https://example.com/callback",
-				OidcApplicationType:     0,
-				TokenEndpointAuthMethod: 1,
+				OidcApplicationType:     intPtr(0),
+				TokenEndpointAuthMethod: intPtr(1),
 				// timeout fields should be nil (not set)
 				RefreshTokenExpirationMinutes: nil,
 				AccessTokenExpirationMinutes:  nil,
@@ -58,9 +69,21 @@ func TestInflateConfiguration(t *testing.T) {
 			},
 			ExpectedOutput: CustomConfigurationOpenId{
 				RedirectURI:             "https://example.com/callback",
-				OidcApplicationType:     0,
-				TokenEndpointAuthMethod: 1,
+				OidcApplicationType:     intPtr(0),
+				TokenEndpointAuthMethod: intPtr(1),
 				// timeout fields should be nil when empty strings
+				RefreshTokenExpirationMinutes: nil,
+				AccessTokenExpirationMinutes:  nil,
+			},
+		},
+		"omits oidc_application_type and token_endpoint_auth_method when unset": {
+			ResourceData: map[string]interface{}{
+				"redirect_uri": "https://example.com/callback",
+			},
+			ExpectedOutput: CustomConfigurationOpenId{
+				RedirectURI:                   "https://example.com/callback",
+				OidcApplicationType:           nil,
+				TokenEndpointAuthMethod:       nil,
 				RefreshTokenExpirationMinutes: nil,
 				AccessTokenExpirationMinutes:  nil,
 			},
@@ -199,23 +222,10 @@ func TestInflateConfiguration(t *testing.T) {
 					if customOidcResult, ok := subj.(CustomConfigurationOpenId); ok {
 						assert.Equal(t, customOidcConfig.RedirectURI, customOidcResult.RedirectURI)
 						assert.Equal(t, customOidcConfig.LoginURL, customOidcResult.LoginURL)
-						assert.Equal(t, customOidcConfig.OidcApplicationType, customOidcResult.OidcApplicationType)
-						assert.Equal(t, customOidcConfig.TokenEndpointAuthMethod, customOidcResult.TokenEndpointAuthMethod)
-
-						// Handle pointer comparisons for timeout fields
-						if customOidcConfig.RefreshTokenExpirationMinutes == nil {
-							assert.Nil(t, customOidcResult.RefreshTokenExpirationMinutes)
-						} else {
-							assert.NotNil(t, customOidcResult.RefreshTokenExpirationMinutes)
-							assert.Equal(t, *customOidcConfig.RefreshTokenExpirationMinutes, *customOidcResult.RefreshTokenExpirationMinutes)
-						}
-
-						if customOidcConfig.AccessTokenExpirationMinutes == nil {
-							assert.Nil(t, customOidcResult.AccessTokenExpirationMinutes)
-						} else {
-							assert.NotNil(t, customOidcResult.AccessTokenExpirationMinutes)
-							assert.Equal(t, *customOidcConfig.AccessTokenExpirationMinutes, *customOidcResult.AccessTokenExpirationMinutes)
-						}
+						assertIntPtrEqual(t, customOidcConfig.OidcApplicationType, customOidcResult.OidcApplicationType)
+						assertIntPtrEqual(t, customOidcConfig.TokenEndpointAuthMethod, customOidcResult.TokenEndpointAuthMethod)
+						assertIntPtrEqual(t, customOidcConfig.RefreshTokenExpirationMinutes, customOidcResult.RefreshTokenExpirationMinutes)
+						assertIntPtrEqual(t, customOidcConfig.AccessTokenExpirationMinutes, customOidcResult.AccessTokenExpirationMinutes)
 					} else {
 						t.Errorf("Expected CustomConfigurationOpenId but got different type: %T", subj)
 					}

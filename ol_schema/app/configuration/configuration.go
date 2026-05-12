@@ -15,8 +15,8 @@ type CustomConfigurationOpenId struct {
 	RedirectURI                   string `json:"redirect_uri,omitempty"`
 	LoginURL                      string `json:"login_url,omitempty"`
 	PostLogoutRedirectURI         string `json:"post_logout_redirect_uri,omitempty"`
-	OidcApplicationType           int    `json:"oidc_application_type,omitempty"`
-	TokenEndpointAuthMethod       int    `json:"token_endpoint_auth_method,omitempty"`
+	OidcApplicationType           *int   `json:"oidc_application_type,omitempty"`
+	TokenEndpointAuthMethod       *int   `json:"token_endpoint_auth_method,omitempty"`
 	AccessTokenExpirationMinutes  *int   `json:"access_token_expiration_minutes,omitempty"`
 	RefreshTokenExpirationMinutes *int   `json:"refresh_token_expiration_minutes,omitempty"`
 }
@@ -55,17 +55,19 @@ func intPtr(val int) *int {
 	return &val
 }
 
-// handleTimeoutField processes a timeout field value and returns a pointer if the value is valid
-func handleTimeoutField(s map[string]interface{}, fieldName string) (*int, error) {
+// handleOptionalIntField parses an integer-valued string field and returns a
+// pointer to its int value. An absent key or empty string yields nil so the
+// caller can omit the field from the JSON payload, preserving the API default
+// rather than overwriting it with 0.
+func handleOptionalIntField(s map[string]interface{}, fieldName string) (*int, error) {
 	if val, exists := s[fieldName]; exists {
 		if strVal, ok := val.(string); ok && strVal != "" {
-			if timeoutVal, err := getInt(val); err != nil {
+			if intVal, err := getInt(val); err != nil {
 				return nil, err
 			} else {
-				return intPtr(timeoutVal), nil
+				return intPtr(intVal), nil
 			}
 		}
-		// If empty string or not provided, return nil (will be omitted from JSON)
 	}
 	return nil, nil
 }
@@ -91,21 +93,21 @@ func Inflate(s map[string]interface{}) (interface{}, error) {
 		customOidc.LoginURL = getString(s["login_url"])
 		customOidc.PostLogoutRedirectURI = getString(s["post_logout_redirect_uri"])
 
-		// Handle timeout fields specially - only set them if explicitly provided and non-empty
-		// This prevents overriding existing API values with 0 when fields are not specified
-		if customOidc.RefreshTokenExpirationMinutes, err = handleTimeoutField(s, "refresh_token_expiration_minutes"); err != nil {
+		// Use pointer-typed fields so explicit "0" is sent to the API while an
+		// unset field is omitted (avoids overriding API defaults on update).
+		if customOidc.RefreshTokenExpirationMinutes, err = handleOptionalIntField(s, "refresh_token_expiration_minutes"); err != nil {
 			return nil, err
 		}
 
-		if customOidc.AccessTokenExpirationMinutes, err = handleTimeoutField(s, "access_token_expiration_minutes"); err != nil {
+		if customOidc.AccessTokenExpirationMinutes, err = handleOptionalIntField(s, "access_token_expiration_minutes"); err != nil {
 			return nil, err
 		}
 
-		// Convert string to int for these required fields
-		if customOidc.OidcApplicationType, err = getInt(s["oidc_application_type"]); err != nil {
+		if customOidc.OidcApplicationType, err = handleOptionalIntField(s, "oidc_application_type"); err != nil {
 			return nil, err
 		}
-		if customOidc.TokenEndpointAuthMethod, err = getInt(s["token_endpoint_auth_method"]); err != nil {
+
+		if customOidc.TokenEndpointAuthMethod, err = handleOptionalIntField(s, "token_endpoint_auth_method"); err != nil {
 			return nil, err
 		}
 
@@ -225,11 +227,11 @@ func Flatten(config map[string]interface{}) map[string]interface{} {
 			tfOut["refresh_token_expiration_minutes"] = strconv.FormatInt(int64(val), 10)
 		}
 
-		if val, ok := config["oidc_application_type"].(float64); ok && val != 0 {
+		if val, ok := config["oidc_application_type"].(float64); ok {
 			tfOut["oidc_application_type"] = strconv.FormatInt(int64(val), 10)
 		}
 
-		if val, ok := config["token_endpoint_auth_method"].(float64); ok && val != 0 {
+		if val, ok := config["token_endpoint_auth_method"].(float64); ok {
 			tfOut["token_endpoint_auth_method"] = strconv.FormatInt(int64(val), 10)
 		}
 
