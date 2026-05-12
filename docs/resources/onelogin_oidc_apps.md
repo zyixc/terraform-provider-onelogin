@@ -169,6 +169,8 @@ The following arguments are supported:
 * `configuration`
   * `redirect_uri` - The redirect_uri for the OIDC flow.
 
+  * `post_logout_redirect_uri` - The redirect_uri for the app to send the user to after logout.
+
   * `refresh_token_expiration_minutes` - Number of minutes for the refresh token to be valid.
 
   * `login_url` - The login_url for the OIDC flow.
